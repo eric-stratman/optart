@@ -8,7 +8,7 @@ import os
 
 
 class DominoSolver:
-    def __init__(self, s, width, height, image_path, pixels_per_domino=100):
+    def __init__(self, s, columns, rows, image_path, pixels_per_domino=1):
         """
         A complete set of double-nine dominoes contains 55 dominoes,
         partition the target image and the canvas into m rows and n columns such that mn=110s.
@@ -16,10 +16,11 @@ class DominoSolver:
         @param width: Number of rows
         @param height: Number of columns
         """
+        self.domino_image = None
         self.s = s
-        self.width = width
-        self.height = height
-        if width * height / s != 110:
+        self.rows = rows
+        self.columns = columns
+        if columns * rows / s != 110:
             raise Exception("Make sure that (m*n)/s=110")
         self.pixels_per_domino = pixels_per_domino
         self.image_path = image_path
@@ -57,7 +58,7 @@ class DominoSolver:
         # restrict pixels to -0.5 to 9.5
         grayImage = np.interp(grayImage, (grayImage.min(), grayImage.max()), (-0.5, 9.5))
         grayImage = cv2.resize(grayImage,
-                               dsize=(self.pixels_per_domino * self.height, self.pixels_per_domino * self.width),
+                               dsize=(1 * self.columns, 1 * self.rows),
                                interpolation=cv2.INTER_CUBIC)
         self.rescaled_image = grayImage
         print("  --Done")
@@ -65,15 +66,15 @@ class DominoSolver:
     def build_pairs(self):
         # set P
         p = set()
-        for i in range(0, self.width - 1):
-            for j in range(0, self.height):
-                pair = ((i, j), (i + 1, j))
+        for i in range(0, self.columns - 1):
+            for j in range(0, self.rows):
+                pair = ((i, j), (i + 1, j))  # horizontal
                 p.add(pair)
                 self.P_query[i, j].add(pair)
                 self.P_query[i + 1, j].add(pair)
-        for i in range(0, self.width):
-            for j in range(0, self.height - 1):
-                pair = ((i, j), (i, j + 1))
+        for i in range(0, self.columns):
+            for j in range(0, self.rows - 1):
+                pair = ((i, j), (i, j + 1))  # vertical
                 p.add(pair)
                 self.P_query[i, j].add(pair)
                 self.P_query[i, j + 1].add(pair)
@@ -95,9 +96,9 @@ class DominoSolver:
         for d in self.D:
             d1, d2 = d[0], d[1]
             for p in self.P:
-                i1, j1, i2, j2 = p[0][0], p[0][1], p[1][0], p[1][1]
-                c = min((d1 - self.rescaled_image[i1, j1]) ** 2 + (d2 - self.rescaled_image[i2, j2]) ** 2,
-                        (d1 - self.rescaled_image[i2, j2]) ** 2 + (d2 - self.rescaled_image[i1, j1]) ** 2
+                col1, row1, col2, row2 = p[0][0], p[0][1], p[1][0], p[1][1]
+                c = min((d1 - self.rescaled_image[row1, col1]) ** 2 + (d2 - self.rescaled_image[row2, col2]) ** 2,
+                        (d1 - self.rescaled_image[row2, col2]) ** 2 + (d2 - self.rescaled_image[row1, col1]) ** 2
                         )
                 self.cost[d, p] = c
         print("  --Done")
@@ -115,8 +116,8 @@ class DominoSolver:
         # ensure each domino is placed on the canvas
         self.model.addConstrs(gp.quicksum(self.x[d, p] for p in self.P) == self.s for d in self.D)
         # each square is covered by exactly one domino
-        for i in range(0, self.width):
-            for j in range(0, self.height):
+        for i in range(0, self.columns):
+            for j in range(0, self.rows):
                 # get subset of P containing i,j
                 p_subset = list(self.P_query[i, j])
                 self.model.addConstr(gp.quicksum(self.x[d, p] for p in p_subset for d in self.D) == 1)
@@ -147,9 +148,9 @@ class DominoSolver:
             d = m[0]
             d1, d2 = d[0], d[1]
             p = m[1]
-            i1, j1, i2, j2 = p[0][0], p[0][1], p[1][0], p[1][1]
-            temp1 = (d1 - self.rescaled_image[i1, j1]) ** 2 + (d2 - self.rescaled_image[i2, j2]) ** 2
-            temp2 = (d1 - self.rescaled_image[i2, j2]) ** 2 + (d2 - self.rescaled_image[i1, j1]) ** 2
+            col1, row1, col2, row2 = p[0][0], p[0][1], p[1][0], p[1][1]
+            temp1 = (d1 - self.rescaled_image[row1, col1]) ** 2 + (d2 - self.rescaled_image[row2, col2]) ** 2
+            temp2 = (d1 - self.rescaled_image[row2, col2]) ** 2 + (d2 - self.rescaled_image[row1, col1]) ** 2
             if temp1 <= temp2:
                 self.orientations.append(((d1, d2), p))
             else:
@@ -163,36 +164,41 @@ class DominoSolver:
         print("\n-Building domino image")
         pixels_per_domino = self.pixels_per_domino
         # create a background and paste domino over it using PIL library
-        domino_image = Image.new('RGBA', self.rescaled_image.shape)
+        domino_image = Image.new('RGBA', (self.pixels_per_domino * self.columns, self.pixels_per_domino * self.rows))
         for o in self.orientations:
             d, p = o[0], o[1]
             # d tells which domino to use and p tells orientation
-            x1, x2 = p[0][0], p[1][0]
-            y1, y2 = p[0][1], p[1][1]
+            # x1, x2 = p[0][0], p[1][0]
+            # y1, y2 = p[0][1], p[1][1]
+            col1, row1, col2, row2 = p[0][0], p[0][1], p[1][0], p[1][1]
             # check if domino d at position p is horizontal or vertical
-            if y1 == y2:
+            if row1 == row2:
                 horizontal = True
             else:
                 horizontal = False
             domino_file = str(d[0]) + "-" + str(d[1]) + ".png"
             # all domino images are vertical in the directory
-            single_domino_img = Image.open(f'./dominoes/{domino_file}', 'r').resize(
-                (pixels_per_domino, 2 * pixels_per_domino), Image.NEAREST)  # dominoes are of ratio 1:2
+            single_domino_img = Image.open(f'./dominoes/{domino_file}', 'r')
+            single_domino_img = single_domino_img.resize(
+                (1 * pixels_per_domino, 2 * pixels_per_domino), Image.NEAREST)  # dominoes are of ratio 1:2
             if horizontal:
                 # rotates counter clockwise
                 single_domino_img = single_domino_img.rotate(90, expand=True)
             # give upper left corner 
-            position = (x1 * pixels_per_domino, y1 * pixels_per_domino)
+            position = (col1 * pixels_per_domino, row1 * pixels_per_domino)
             domino_image.paste(single_domino_img, position)
         output_path = './domino_output/'
         if not os.path.isdir('./domino_output'):
             os.makedirs(output_path)
         filename = self.image_path.split("/")[-1].split(".")[0] + '-domino' + '.png'
         domino_image.save(output_path + filename)
+        self.domino_image = domino_image
         print("Task completed, Image saved as {}".format(output_path + filename))
 
 
 if __name__ == '__main__':
-    domi = DominoSolver(s=6, width=33, height=20, image_path='/Users/soni6/Downloads/ts.jpeg',
-                        pixels_per_domino=10)
+    print("--Run model")
+    # make sure rows x columns = 110 x s
+    domi = DominoSolver(s=12, rows=44, columns=30, image_path='./input_images/ts.jpeg',
+                        pixels_per_domino=200)
     domi.fit()
