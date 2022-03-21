@@ -12,7 +12,7 @@ class DominoSolver:
         """
         A complete set of double-nine dominoes contains 55 dominoes,
         partition the target image and the canvas into m rows and n columns such that mn=110s.
-        @param s:Num of domionoes set
+        @param s:Num of domionos set
         @param width: Number of rows
         @param height: Number of columns
         """
@@ -35,7 +35,7 @@ class DominoSolver:
         self.model = gp.Model()
         self.x = {}
         # output placeholders
-        self.matchings = []  # (d1,d2) and (d1,d1) are treated as the same by the model
+        self.matchings = []  # (d1,d2) and (d2,d1) are treated as the same by the model
         self.orientations = []  # distinction between (d1,d2) and (d2,d1)
 
     def fit(self):
@@ -57,7 +57,7 @@ class DominoSolver:
         # restrict pixels to -0.5 to 9.5
         grayImage = np.interp(grayImage, (grayImage.min(), grayImage.max()), (-0.5, 9.5))
         grayImage = cv2.resize(grayImage,
-                               dsize=(self.pixels_per_domino * self.width, self.pixels_per_domino * self.height),
+                               dsize=(self.pixels_per_domino * self.height, self.pixels_per_domino * self.width),
                                interpolation=cv2.INTER_CUBIC)
         self.rescaled_image = grayImage
         print("  --Done")
@@ -66,7 +66,7 @@ class DominoSolver:
         # set P
         p = set()
         for i in range(0, self.width - 1):
-            for j in range(i, self.height):
+            for j in range(0, self.height):
                 pair = ((i, j), (i + 1, j))
                 p.add(pair)
                 self.P_query[i, j].add(pair)
@@ -123,6 +123,7 @@ class DominoSolver:
         # self.model.ModelSense = 1  # minimize
         self.model.setObjective(gp.quicksum(self.x[d, p] * self.cost[d, p] for d in self.D for p in self.P),
                                 gp.GRB.MINIMIZE)
+        self.model.update()
         print("  --Done")
 
     def solve_model(self, verbose=0):
@@ -162,7 +163,7 @@ class DominoSolver:
         print("\n-Building domino image")
         pixels_per_domino = self.pixels_per_domino
         # create a background and paste domino over it using PIL library
-        domino_image = Image.new('RGBA', (self.width * pixels_per_domino, self.height * pixels_per_domino))
+        domino_image = Image.new('RGBA', self.rescaled_image.shape)
         for o in self.orientations:
             d, p = o[0], o[1]
             # d tells which domino to use and p tells orientation
@@ -180,7 +181,7 @@ class DominoSolver:
             if horizontal:
                 # rotates counter clockwise
                 single_domino_img = single_domino_img.rotate(90, expand=True)
-            # give upper left corner
+            # give upper left corner 
             position = (x1 * pixels_per_domino, y1 * pixels_per_domino)
             domino_image.paste(single_domino_img, position)
         output_path = './domino_output/'
@@ -192,6 +193,6 @@ class DominoSolver:
 
 
 if __name__ == '__main__':
-    domi = DominoSolver(s=12, width=30, height=44, image_path='/Users/soni6/Downloads/capitol.jpeg',
-                        pixels_per_domino=100)
+    domi = DominoSolver(s=6, width=33, height=20, image_path='/Users/soni6/Downloads/ts.jpeg',
+                        pixels_per_domino=10)
     domi.fit()
