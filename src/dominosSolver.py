@@ -178,7 +178,7 @@ class DominoSolver:
                 horizontal = False
             domino_file = str(d[0]) + "-" + str(d[1]) + ".png"
             # all domino images are vertical in the directory
-            single_domino_img = Image.open(f'./dominoes/{domino_file}', 'r')
+            single_domino_img = Image.open(f'../dominoes/{domino_file}', 'r')
             single_domino_img = single_domino_img.resize(
                 (1 * pixels_per_domino, 2 * pixels_per_domino), Image.NEAREST)  # dominoes are of ratio 1:2
             if horizontal:
@@ -187,8 +187,8 @@ class DominoSolver:
             # give upper left corner 
             position = (col1 * pixels_per_domino, row1 * pixels_per_domino)
             domino_image.paste(single_domino_img, position)
-        output_path = './domino_output/'
-        if not os.path.isdir('./domino_output'):
+        output_path = '../domino_output/'
+        if not os.path.isdir('../domino_output'):
             os.makedirs(output_path)
         filename = self.image_path.split("/")[-1].split(".")[0] + '-domino' + '.png'
         domino_image.save(output_path + filename)
@@ -199,6 +199,7 @@ class DominoSolver:
 if __name__ == '__main__':
     print("--Run model")
     # make sure rows x columns = 110 x s
-    domi = DominoSolver(s=12, rows=44, columns=30, image_path='./input_images/ts.jpeg',
-                        pixels_per_domino=200)
+    domi = DominoSolver(s=36, rows=72, columns=55,
+                        image_path='../input_images/ts.jpeg',
+                        pixels_per_domino=25)
     domi.fit()
